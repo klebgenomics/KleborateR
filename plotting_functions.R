@@ -18,7 +18,7 @@ plot_raw_adj_pyramid <- function(
   
   # Check required columns --------------------------------------------------
   if ('default' %in% y_order){y_order = counts[[1]]}
-  for(name in c(fill_var, 'Total')){
+  for(name in c(fill_var, 'raw_count')){
     if(!name %in% names(counts)){
       stop(glue::glue('name: {name} not in counts data'))
     }
@@ -26,13 +26,21 @@ plot_raw_adj_pyramid <- function(
   # Prepare counts --------------------------------------------------
   counts %>%
     # This filter makes sure there are no empty columns after scaling by order
-    filter(.[[1]] %in% y_order) %>% 
-    mutate(raw_prop = raw_prop * -1) %>% # Reverse raw_props to make the pyramid
-    pivot_longer(c(raw_prop, adj_prop), names_to = 'prop', values_to = 'percent') %>% 
-    mutate(prop=as_factor(str_to_sentence(str_replace(prop, "_prop", " %")))) %>%
+    dplyr::filter(.[[1]] %in% y_order) %>% 
+    # Reverse raw_props to make the pyramid
+    dplyr::mutate(raw_prop = raw_prop * -1) %>%
+    tidyr::pivot_longer(
+      c(raw_prop, adj_prop),
+      names_to = 'prop', values_to = 'percent'
+      ) %>% 
+    dplyr::mutate(
+      prop=as_factor(str_to_sentence(str_replace(prop, "_prop", " %")))
+      ) %>%
     
     # Plot data --------------------------------------------------
-    ggplot(aes(x=.data[[names(.)[1]]], fill=.data[[fill_var]], label=Total, y=percent)) +
+    ggplot(
+      aes(x=.data[[names(.)[1]]], fill=.data[[fill_var]], label=raw_count, y=percent)
+      ) +
     geom_bar(stat="identity") +
     ggpol::facet_share(~prop, dir="h", scales="free", reverse_num=T) +
     coord_flip() +
@@ -68,18 +76,17 @@ plot_var_heatmap <- function(
   
   # Default order is the first column
   if ('default' %in% y_order){
-    y_order = raw_adj_props |>  pull(1) |>  unique()
+    y_order = raw_adj_props |>  dplyr::pull(1) |>  unique()
     }
   
   # X axis is ALWAYS the second column
   x = names(raw_adj_props)[2]
   
   x_rank = raw_adj_props |> 
-    group_by(.data[[x]]) |> 
-    summarise(n=sum(adj_count)) |> 
-    arrange(-n) |> 
-    slice_head(n=max_x) |> # Slice the top adj values for ordered x-axis
-    pull(1)
+    dplyr::summarise(.by = .data[[x]], n = sum(adj_count)) |> 
+    dplyr::arrange(-n) |> 
+    dplyr::slice_head(n=max_x) |> # Slice the top adj values for ordered x-axis
+    dplyr::pull(1)
   
   raw_adj_props %>% 
     ggplot(
@@ -134,12 +141,12 @@ plot_distinct_bars <- function(counts, var1, y_order=c('default')){
 plot_country_coverage <- function(raw_adj_props){
   sf::sf_use_s2(FALSE)  # Prevents MULTIPOINT error in R Shiny
   world <- rnaturalearth::ne_countries(returnclass = "sf", scale = "large")
-  countries <- world %>% 
-    right_join(raw_adj_props, by=c("name_long"="Country")) %>% 
-    rename("Country"="name_long")
-  world_cropped <- st_crop(world, st_bbox(countries)) %>% 
+  countries <- world |>
+    dplyr::right_join(raw_adj_props, by=c("name_long"="Country")) |>
+    dplyr::rename("Country"="name_long")
+  world_cropped <- sf::st_crop(world, sf::st_bbox(countries)) %>% 
     # Prevents this bug https://github.com/plotly/plotly.R/issues/1785#issuecomment-643563527
-    st_cast("MULTIPOLYGON")
+    sf::st_cast("MULTIPOLYGON")
   g <- ggplot(world_cropped) + 
     geom_sf(fill = "white", size=.1) +
     geom_sf(
@@ -212,46 +219,6 @@ plot_cumulative_coverage <-  function(
       linewidth=0.5
       )
 }
-
-#' Calculate the raw and outbreak adjusted proportions over time
-#' @param kleborate_data A tibble of Kleborate output data
-#' @param var1 A string corresponding to a column header to quantify over time
-#' @param var2 A string corresponding to a column header to quantify over time
-#' @export
-plot_temporal_for_var <- function(kleborate_data, var1, var2, top_n=10) {
-  
-  # First, calculate the proportions of the variable for each country
-  props <- kleborate_data %>% raw_adj_prop(var2, var1) %>%
-    slice(1:top_n) # Limit the top n of var based on user input
-  
-  g <- kleborate_data %>% 
-    # Next, calculate the proportions of the variable for each Year
-    raw_adj_prop("Year", var1) %>% 
-    right_join(props, by=names(props)) %>% # Right join the country props to order the data
-    ggplot(aes_string(x="Year", y="adj_prop", group=var1, col=var1)) +
-    geom_line(alpha=0.4, linewidth=1.5) +
-    geom_point(aes(y=raw_prop), shape=3) +
-    scale_x_continuous(breaks=scales::pretty_breaks()) +
-    labs(y="Adjusted %", caption="+ = raw %") +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-  return(g)}
-
-#' Calculate the raw and outbreak adjusted proportions over time
-#' @param kleborate_data A tibble of Kleborate output data
-#' @param var1 A string corresponding to a column header to quantify over time
-#' @export
-plot_temporal <- function(kleborate_data, var1, prop='adj_prop', top_n=20) {
-  g <- raw_adj_prop(kleborate_data, 'Year', var1) %>%
-    filter(.[[var1]] %in% get_counts(kleborate_data, var1)[[var1]][1:top_n]) %>% 
-    ggplot(aes(x=Year, y=.data[[prop]], group=.data[[var1]], col=.data[[var1]])) +
-    geom_line(alpha=.4, linewidth=1.5) +
-    scale_x_continuous(breaks=scales::pretty_breaks()) +
-    theme_minimal() +
-    labs(y=paste(str_to_sentence(str_replace(prop, '_prop', ' proportion'))), "%") +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-  return(g)
-  }
 
 #' Plot a Kaptive locus with `gggenes`
 #' @param LOCUS_GENES A `tibble` imported from `antigen_db.xlsx`
@@ -349,4 +316,3 @@ plot_antigen_image <- function(molecule_file_df) {
         ggplot2::theme_void()
     ), ncol = 1)
 }
-

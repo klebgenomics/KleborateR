@@ -39,25 +39,21 @@ get_counts <- function(
   
   # We NEED to remove var1 from *_vars for the all_of() functions
   if(var1 %in% epi_vars){
-    warning(glue::glue('Removing var1 ({var1}) from epi_vars'))
+    message(paste('Removing', var1, 'from epi_vars'))
     epi_vars = epi_vars[!epi_vars == var1]
   }
   if(var1 %in% adj_vars){
-    warning(glue::glue('Removing var1 ({var1}) from adj_vars'))
+    message(paste('Removing', var1, 'from adj_vars'))
     adj_vars = adj_vars[!adj_vars == var1]
   }
-  
-  # Create a column name for the adjusted count
-  adj_var_name = paste(adj_vars, collapse = '_per_')
-
   # Add Large_cluster if Cluster column present
   if('Cluster' %in% names(kleborate_data)){  # Identify large clusters
     kleborate_data <- kleborate_data |>
-      add_count(Cluster) |> 
-      mutate(
-        Large_cluster = if_else(n >= large_cluster_size, Cluster, NA_character_)
+      dplyr::add_count(Cluster) |> 
+      dplyr::mutate(
+        Large_cluster =dplyr::if_else(n >= large_cluster_size, Cluster, NA_character_)
         ) |> 
-      select(!n)
+      dplyr::select(!n)
     epi_vars = c(epi_vars, 'Large_cluster')
   }
   message(paste("Grouping var:", var1))
@@ -65,19 +61,24 @@ get_counts <- function(
   message(paste("Adj vars:", paste(adj_vars, collapse = ", ")))
   
   return(
-    kleborate_data |> 
-      select(all_of(unique(c(var1, epi_vars, adj_vars)))) |> 
-      group_by(across(all_of(var1))) |>
-      summarise(
-        Total=n(), across(all_of(epi_vars), n_distinct, .names = "n_{.col}"),
-        # PERFORM OUTBREAK ADJUSTMENT
-        !!adj_var_name := n_distinct(across(all_of(adj_vars))),
+    kleborate_data |>
+      dplyr::reframe(
+        .by = all_of(var1),
+        # n = nrow(kleborate_data),
+        raw_count = dplyr::n(),
+        adj_count = dplyr::n_distinct(dplyr::across(tidyselect::all_of(adj_vars))),
+        dplyr::across(
+          tidyselect::all_of(epi_vars), n_distinct, .names = "n_{.col}"
+        )
       ) |>
-      mutate(
-        raw_prop = Total/sum(Total)*100,
-        adj_prop = get(adj_var_name)/sum(get(adj_var_name))*100
-      ) |> 
-      arrange(-adj_prop)
+      dplyr::mutate(
+        raw_prop = raw_count/sum(raw_count),
+        adj_prop = adj_count/sum(adj_count)
+      ) |>
+      dplyr::select(
+        tidyselect::all_of(var1), raw_count, adj_count, raw_prop, adj_prop, dplyr::everything()
+      ) |>
+      dplyr::arrange(-adj_prop)
   )}
 
 #' Calculate the raw and outbreak adjusted proportions of Kleborate columns
@@ -119,40 +120,28 @@ raw_adj_prop <- function(
   # Check grouping vars
   for (i in grouping_vars) { 
     if(i %in% adj_vars){
-      warning(glue::glue('grouping_var: {i} in adj_vars, removing from adj_vars'))
+      message(paste('grouping_var:', i, 'in adj_vars, removing from adj_vars'))
       adj_vars = adj_vars[!adj_vars == i]
       }
-    }
+  }
   message(paste("Grouping vars:", paste(grouping_vars, collapse = ", ")))
   message(paste("Denominator:", denominator))
   message(paste("Adj vars:", paste(adj_vars, collapse = ", ")))
   
-  all_vars = unique(c(denominator, adj_vars, grouping_vars))
-  
   return(
     kleborate_data |>
-      select(all_of(all_vars)) |> 
-      group_by(across(all_of(denominator))) |>
-      mutate(
-        raw_denominator = n(),
-        # PERFORM DENOMINATOR OUTBREAK ADJUSTMENT
-        adj_denominator = n_distinct(across(all_of(adj_vars))),
+      dplyr::reframe(
+        .by = tidyselect::all_of(grouping_vars),
+        raw_count = dplyr::n(),
+        adj_count = dplyr::n_distinct(across(all_of(adj_vars))),
+        ) |>
+      dplyr::mutate(
+        .by = tidyselect::all_of(denominator),
+        raw_prop = raw_count/sum(raw_count),
+        adj_prop = adj_count/sum(adj_count)
       ) |>
-      group_by(across(all_of(grouping_vars))) |>
-      summarise(
-        raw_denominator = raw_denominator, 
-        adj_denominator = adj_denominator,
-        raw_count=n(),
-        # PERFORM GROUP OUTBREAK ADJUSTMENT
-        adj_count = n_distinct(across(all_of(adj_vars))),
-        raw_prop =raw_count/raw_denominator * 100,
-        adj_prop = adj_count/adj_denominator * 100
-      ) |>
-      ungroup() |> 
-      distinct() |> 
-      arrange(-adj_count) |> 
-      rename_with(
-        ~str_replace(.x, "denominator", denominator), contains('denominator'))
+      dplyr::distinct() |>
+     dplyr:: arrange(-adj_count)
   )} 
 
 #' Filter genomes in a Kleborate output tibble
@@ -213,7 +202,7 @@ clean_data <- function(kleborate_data) {
   return(
     kleborate_data %>%
       # Tidy up country data for plotting map
-      mutate(Country = case_when(
+     dplyr::mutate(Country = case_when(
         Country == 'UK' ~ 'United Kingdom',
         Country == 'Laos' ~ 'Lao PDR',
         Country == 'Republic of Ireland' ~ 'Ireland',
@@ -225,91 +214,91 @@ clean_data <- function(kleborate_data) {
       join_world_data() %>%
       
       # convert scientific name to common name
-      mutate(Source = if_else(str_detect(Source, 'homo'), 'human', Source)) %>% 
+     dplyr::mutate(Source =dplyr::if_else(str_detect(Source, 'homo'), 'human', Source)) %>% 
       
       # unify age groups
-      mutate(
+     dplyr::mutate(
         Age_group = case_when(
-          str_detect(Age_group, 'neo') ~ 'neonatal',
-          str_detect(Age_group, 'adul') ~ 'adult',
+         stringr::str_detect(Age_group, 'neo') ~ 'neonatal',
+         stringr::str_detect(Age_group, 'adul') ~ 'adult',
           as.numeric(Age_group) >= 16 ~ 'adult',
           as.numeric(Age_group) < 16 ~ 'child',
           as.numeric(Age_group) == 0 ~ 'neonatal',
           is.na(Age_group) ~ 'unknown',
           TRUE ~ tolower(Age_group))) %>%
       
-      mutate(Sample = str_replace(Sample,'[()]|^other_', "")) %>% 
-      mutate(Sample = str_replace(Sample,'_', " ")) %>%
+     dplyr::mutate(Sample = str_replace(Sample,'[()]|^other_', "")) %>% 
+     dplyr::mutate(Sample = str_replace(Sample,'_', " ")) %>%
       
       # Clean the _locus/_type columns from [unknown (best match = )]
-      mutate(
-        across(
+     dplyr::mutate(
+       dplyr::across(
           matches("_locus$|_type$"),
           ~if_else(str_detect(.x, 'unknown'), str_extract(.x, LOCUS_TYPE_REGEX), .x)
           )
         ) %>%
       # simplify omp
-      mutate(Omp_mutations_simplified = str_replace_all(Omp_mutations, "-[0-9]+%", "-trunc"), 
-             Omp_simple = if_else(Omp_mutations == "-", "wt", "mut")) %>%
+     dplyr::mutate(Omp_mutations_simplified = str_replace_all(Omp_mutations, "-[0-9]+%", "-trunc"), 
+             Omp_simple =dplyr::if_else(Omp_mutations == "-", "wt", "mut")) %>%
       
       # simplify carbapenemases and combine with omp
-      mutate(Bla_Carb_simplified = case_when(
-        str_detect(Bla_Carb_acquired, "IMP") ~ "IMP", 
-        str_detect(Bla_Carb_acquired, "KPC") ~ "KPC",
-        str_detect(Bla_Carb_acquired, "OXA") ~ "OXA", 
-        str_detect(Bla_Carb_acquired, "NDM") ~ "NDM",
-        str_detect(Bla_Carb_acquired, "VIM") ~ "VIM", 
-        str_detect(Bla_Carb_acquired, ";") ~ "multiple",
-        str_detect(Bla_Carb_acquired, "[A-Z]+") ~ "other",
+     dplyr::mutate(Bla_Carb_simplified = case_when(
+       stringr::str_detect(Bla_Carb_acquired, "IMP") ~ "IMP", 
+       stringr::str_detect(Bla_Carb_acquired, "KPC") ~ "KPC",
+       stringr::str_detect(Bla_Carb_acquired, "OXA") ~ "OXA", 
+       stringr::str_detect(Bla_Carb_acquired, "NDM") ~ "NDM",
+       stringr::str_detect(Bla_Carb_acquired, "VIM") ~ "VIM", 
+       stringr::str_detect(Bla_Carb_acquired, ";") ~ "multiple",
+       stringr::str_detect(Bla_Carb_acquired, "[A-Z]+") ~ "other",
         TRUE ~ "-")) %>%
-      mutate(carbapenemase_omp_combination = paste(Bla_Carb_simplified, Omp_simple, sep = " ")) %>%
+     dplyr::mutate(carbapenemase_omp_combination = paste(Bla_Carb_simplified, Omp_simple, sep = " ")) %>%
       
       # simplify ESBLs and combine with omp
-      mutate(Bla_ESBL_simplified = case_when(
-        str_detect(Bla_ESBL_acquired, "CTX-M") ~ "CTX-M-other", 
+     dplyr::mutate(Bla_ESBL_simplified = case_when(
+       stringr::str_detect(Bla_ESBL_acquired, "CTX-M") ~ "CTX-M-other", 
         Bla_ESBL_acquired == "CTX-M-14" ~ "CTX-M-14",
         Bla_ESBL_acquired == "CTX-M-15" ~ "CTX-M-15",
         Bla_ESBL_acquired == "CTX-M-65" ~ "CTX-M-65",
-        str_detect(Bla_ESBL_acquired, "SHV") ~ "SHV",
-        str_detect(Bla_ESBL_acquired, "TEM") ~ "TEM",
-        str_detect(Bla_ESBL_acquired, ";") ~ "multiple",
-        str_detect(Bla_ESBL_acquired, "[A-Z]+") ~ "other",
+       stringr::str_detect(Bla_ESBL_acquired, "SHV") ~ "SHV",
+       stringr::str_detect(Bla_ESBL_acquired, "TEM") ~ "TEM",
+       stringr::str_detect(Bla_ESBL_acquired, ";") ~ "multiple",
+       stringr::str_detect(Bla_ESBL_acquired, "[A-Z]+") ~ "other",
         TRUE ~ "-")) %>%
-      mutate(ESBL_omp_combination = paste(Bla_ESBL_simplified, Omp_simple, sep = " ")) %>%
+     dplyr::mutate(ESBL_omp_combination = paste(Bla_ESBL_simplified, Omp_simple, sep = " ")) %>%
       
       # simplify bla acquired and combine with omp
-      mutate(Bla_acq_simplified = case_when(
-        str_detect(Bla_acquired, "TEM") ~ "TEM",
-        str_detect(Bla_acquired, "OXA") ~ "OXA",
-        str_detect(Bla_acquired, "LAP") ~ "LAP",
-        str_detect(Bla_acquired, "DHA") ~ "DHA",
-        str_detect(Bla_acquired, ";") ~ "multiple", 
-        str_detect(Bla_acquired, "[A-Z]+") ~ "other",
+     dplyr::mutate(Bla_acq_simplified = case_when(
+       stringr::str_detect(Bla_acquired, "TEM") ~ "TEM",
+       stringr::str_detect(Bla_acquired, "OXA") ~ "OXA",
+       stringr::str_detect(Bla_acquired, "LAP") ~ "LAP",
+       stringr::str_detect(Bla_acquired, "DHA") ~ "DHA",
+       stringr::str_detect(Bla_acquired, ";") ~ "multiple", 
+       stringr::str_detect(Bla_acquired, "[A-Z]+") ~ "other",
         TRUE ~ "-")) %>%
-      mutate(Bla_acquired_omp_combination = paste(Bla_acq_simplified, Omp_simple, sep = " ")) %>%
+     dplyr::mutate(Bla_acquired_omp_combination = paste(Bla_acq_simplified, Omp_simple, sep = " ")) %>%
       
       #  # rmpADC lineage simplification
-      #  mutate(rmpADC_simplified = case_when(
-      #    str_detect(RmpADC, "rmp") ~ str_extract(RmpADC, "rmp [0-9]+"),
-      #    str_detect(RmpADC, "rmp unknown") ~ "rmp unknown",
-      #    str_detect(RmpADC, "rmp 2A") ~ "rmp 2A",
-      #    str_detect(RmpADC, ",") & str_detect(RmpADC, "rmp") ~ "multiple rmp",
+      # dplyr::mutate(rmpADC_simplified = case_when(
+      #   stringr::str_detect(RmpADC, "rmp") ~ str_extract(RmpADC, "rmp [0-9]+"),
+      #   stringr::str_detect(RmpADC, "rmp unknown") ~ "rmp unknown",
+      #   stringr::str_detect(RmpADC, "rmp 2A") ~ "rmp 2A",
+      #   stringr::str_detect(RmpADC, ",") &stringr::str_detect(RmpADC, "rmp") ~ "multiple rmp",
       #    TRUE ~ "-")) %>%
       # 
       #  # rmpADC truncations
-      #  mutate(rmpADC_trunc = case_when(
-    #    str_detect(RmpADC, "rmp") ~ "intact", 
-    #    str_detect(RmpADC, "incomplete") ~ "truncated",
+      # dplyr::mutate(rmpADC_trunc = case_when(
+    #   stringr::str_detect(RmpADC, "rmp") ~ "intact", 
+    #   stringr::str_detect(RmpADC, "incomplete") ~ "truncated",
     #    TRUE ~ "-")) %>%
     # 
     #  # rmpA2 truncations
-    #  mutate(rmpA2_trunc = case_when(
-    #    str_detect(rmpA2, "rmp") ~ "intact",
-    #    str_detect(rmpA2, "%") ~ "truncated",
+    # dplyr::mutate(rmpA2_trunc = case_when(
+    #   stringr::str_detect(rmpA2, "rmp") ~ "intact",
+    #   stringr::str_detect(rmpA2, "%") ~ "truncated",
     #    TRUE ~ "-")) %>%
     
     # convert sample and source to lowercase
-    mutate(
+   dplyr::mutate(
       Sample = str_to_lower(Sample), 
       Source = str_to_lower(Source), 
       Age_group = str_to_lower(Age_group)
@@ -322,7 +311,7 @@ clean_data <- function(kleborate_data) {
 #' `join_world_data()` takes a Kleboate result tibble and a specified column of 
 #' geographic information to join on additional geographical information
 #' specified by `info_cols` using the `ne_col` column.
-#' It will show a warning if a variable in the specified geographic column is
+#' It will show a message if a variable in the specified geographic column is
 #' not found in the specified column in `rnaturalearth::ne_countries`
 #' @param kleborate_data A tibble
 #' @param geo_col A string of the geographic col to join `rnaturalearth::ne_countries`
@@ -351,13 +340,13 @@ join_world_data <- function(
   }
   missing_countries = setdiff(kleborate_data[[geo_col]], ne_data[[ne_col]])
   if (length(missing_countries) > 0) {
-    warning(glue::glue('{missing_countries} were not found in {geo_col}'))
+    message(glue::glue('{missing_countries} were not found in {geo_col}'))
     }
   
  return(
    kleborate_data |> 
      left_join(
-       select(ne_data, all_of(ne_cols)),
+      dplyr::select(ne_data, all_of(ne_cols)),
        by = setNames(nm=geo_col, ne_col)
        ) |>
      rename_with(stringr::str_to_title, .cols = any_of(ne_cols))
@@ -371,7 +360,7 @@ trait_stats <- function(kleborate_data, trait1, trait2, stat_test,
     stat_test, c('chisq.test', 'prop.test', 'cor.test', 'cor'))
   
   if(stat_test %in% c('xsq', 'prop')){
-    count_type = if_else(adjusted == TRUE, 'adj', 'raw')
+    count_type =dplyr::if_else(adjusted == TRUE, 'adj', 'raw')
     count_cols = paste(count_type, c('count', trait1), sep = "_")
     names(count_cols) <- c('successes', 'trials')
     props = raw_adj_prop(kleborate_data, c(trait1, trait2))
@@ -379,7 +368,7 @@ trait_stats <- function(kleborate_data, trait1, trait2, stat_test,
 
   if(stat_test == 'prop.test'){
     props |>
-      select(all_of(c(trait1, trait2, count_cols))) |>
+     dplyr::select(all_of(c(trait1, trait2, count_cols))) |>
       dplyr::rowwise() |>
       dplyr::mutate(
         tst = list(
@@ -397,7 +386,7 @@ trait_stats <- function(kleborate_data, trait1, trait2, stat_test,
   } else if(stat_test == 'cor.test'){
     cor.test(kleborate_data[[trait1]], kleborate_data[[trait2]])
   } else if(stat_test == 'cor'){
-  select(kleborate_data, where(is.numeric)) |>
+ dplyr::select(kleborate_data, where(is.numeric)) |>
     as.matrix() |>
     cor()
   }
