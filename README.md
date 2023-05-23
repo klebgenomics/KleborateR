@@ -61,7 +61,7 @@ isolates_from_site2 <- c("x", "y", "z")
 isolates_from_2009 <- c("a", "b", "c")
 isolates_from_2010 <- c("x", "y", "z")
 
-data <- c() data |>
+data <- data |>
  dplyr::mutate(
   Country = "United Kingdom",
   Site = dplyr::case_when(
@@ -148,7 +148,7 @@ Adj vars: Cluster, Site, Study
 ```
 The output is arranged by `adj_count` in descending order and the default denominator is the first
 variable in the vector (in this case, ST). We can make the K-locus the "ST",  by changing the
-order of the vector to ` c("K_locus", "ST")` OR by using the `denominator` argument: 
+order of the vector to `c("K_locus", "ST")` OR by using the `denominator` argument: 
 `raw_adj_prop(data, c("ST", "K_locus"), denominator="K_locus")`.
 
 From this output preview, we can see that 100% of ST23 isolates have a KL1 capsule (K) locus,
