@@ -167,7 +167,7 @@ source('https://raw.githubusercontent.com/klebgenomics/KleborateR/main/plotting_
 Let's plot the raw and outbreak-adjusted proportions of the O-loci in this data.
 We can provide the `get_counts` output as an argument, or use a pipe like so! 
 
-```
+```r
 get_counts(data, "O_locus") |> plot_raw_adj_pyramid()
 ```
 
