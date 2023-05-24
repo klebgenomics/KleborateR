@@ -55,6 +55,8 @@ The data can have additional columns of metadata for performing adjusted counts 
 You can name them however you wish, but you MUST declare your cluster adjustment and epidemiological columns in the
 downstream functions.
 
+Let's add a bit more metadata for cluster adjustment.
+
 ```r
 isolates_from_site1 <- c("a", "b", "c")
 isolates_from_site2 <- c("x", "y", "z")
@@ -147,7 +149,7 @@ Adj vars: Cluster, Site, Study
 10 ST17  KL25           97        71    0.439    0.452
 ```
 The output is arranged by `adj_count` in descending order and the default denominator is the first
-variable in the vector (in this case, ST). We can make the K-locus the "ST",  by changing the
+variable in the vector (in this case, ST). We can make the denominator "ST" by changing the
 order of the vector to `c("K_locus", "ST")` OR by using the `denominator` argument: 
 `raw_adj_prop(data, c("ST", "K_locus"), denominator="K_locus")`.
 
