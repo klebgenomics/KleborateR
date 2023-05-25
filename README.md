@@ -32,6 +32,7 @@ source("https://raw.githubusercontent.com/klebgenomics/KleborateR/main/cluster_f
 ```
 
 Now I'll read in my SNP distance matrix and calculate clusters using the default SNP distance threshold of 10.
+This will add a 'Cluster' column to the Kleborate data to indicate which genomes belong to the same cluster.
 
 ```r
 snps <- read_snp_diff("pathogenwatch_snp_dist.csv")
@@ -51,7 +52,7 @@ Or just do in a one-liner:
 data <- get_cluster_membership_from_distmat(readr::read_csv("pathogenwatch_kleborate.csv"), read_snp_diff("pathogenwatch_snp_dist.csv")) 
 ```
 
-The data can have additional columns of metadata for performing adjusted counts such as "Country", "Site" and "Cluster".
+The data can have additional columns of metadata for performing adjusted counts such as "Country", "Site" and "Year".
 You can name them however you wish, but you MUST declare your cluster adjustment and epidemiological columns in the
 downstream functions.
 
