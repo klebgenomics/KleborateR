@@ -1,0 +1,47 @@
+---
+title: "test KleborateR"
+author: "Kat Holt"
+date: '2023-05-30'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = getwd())
+```
+
+### prepare data and call clusters
+```{r}
+# load clustering functions
+source("https://raw.githubusercontent.com/klebgenomics/KleborateR/main/cluster_functions.R")
+
+# load kleborate file and SNP distance file from Pathogenwatch, for BARNARDS Kleb pneumo genomes
+kleborate <- readr::read_csv("testdata/barnards-kp-kleborate.csv")
+snps <- read_snp_diff("testdata/barnards-kp-difference-matrix.csv")
+
+# assign clusters based on SNPs
+data <- get_cluster_membership_from_distmat(kleborate, snps)
+
+# add country
+country <- readr::read_csv("testdata/barnards-kp-country.csv")
+data <- data %>% left_join(country)
+
+```
+
+# calculate raw and adjusted prevalences
+
+``` {r}
+# load kleborate processing functions
+source('https://raw.githubusercontent.com/klebgenomics/KleborateR/main/kleborate_functions.R')
+
+get_counts(data, "K_locus", adj_vars=c("Cluster", "ST"), epi_vars=c("ST", "K_locus", "K_type", "O_locus", "O_type", "Country", "Cluster"))
+
+raw_adj_prop(data, c("ST", "K_locus"), adj_vars = c('Cluster', 'ST'))
+```
+
+``` {r}
+source('https://raw.githubusercontent.com/klebgenomics/KleborateR/main/plotting_functions.R')
+
+get_counts(data, "O_locus", adj_vars=c("Cluster", "ST"), epi_vars=c("ST", "K_locus", "K_type", "O_locus", "O_type", "Country", "Cluster")) |> plot_raw_adj_pyramid()
+```
+
