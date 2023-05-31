@@ -21,17 +21,16 @@ get_counts <- function(
     kleborate_data, 
     var1, 
     large_cluster_size = 3,
-    adj_vars=c('Cluster', 'Site', 'Study', 'ST'),
-    epi_vars = c("ST", "K_locus", "K_type", "O_locus", "O_type", "Country", 
-                  "Study", "Site", "Cluster")
+    adj_vars=c('Cluster', 'ST'),
+    epi_vars = c("ST", "K_locus", "K_type", "O_locus", "O_type", "Cluster")
 ){
   
   # Check args
-  if(!is_tibble(kleborate_data)){stop("kleborate_data must be a tibble")}
-  if(!is.character(var1)){stop("var1 must be a string")}
+  if(!is_tibble(kleborate_data)){stop(paste(base::quote(kleborate_data), "must be a tibble"))}
+  if(!is.character(var1)){stop("var1 must be a character string")}
   for(i in unique(c(var1, adj_vars, epi_vars))){
     if(!i %in% names(kleborate_data)){
-      stop(paste(i, "not in kleborate_data"))
+      stop(paste(i, "not in", base::quote(kleborate_data)))
     }
   }
   if(large_cluster_size != round(large_cluster_size)){
@@ -39,21 +38,23 @@ get_counts <- function(
   
   # We NEED to remove var1 from *_vars for the all_of() functions
   if(var1 %in% epi_vars){
-    message(paste('Removing', var1, 'from epi_vars'))
+    message(paste('var1:', var1, 'in epi_vars, removing from epi_vars'))
     epi_vars = epi_vars[!epi_vars == var1]
   }
   if(var1 %in% adj_vars){
-    message(paste('Removing', var1, 'from adj_vars'))
+     message(paste('var1:', var1, 'in adj_vars, removing from adj_vars'))
     adj_vars = adj_vars[!adj_vars == var1]
   }
-  # Add Large_cluster if Cluster column present
-  if('Cluster' %in% names(kleborate_data)){  # Identify large clusters
+  # Add Large_cluster if Cluster is in adj_vars
+  # Addresses: change if statement to determine whether large cluster calculation is needed #2
+  # Only really applicable for plotting, consider depreciating
+  if('Cluster' %in% adj_vars){  # Identify large clusters
     kleborate_data <- kleborate_data |>
-      dplyr::add_count(Cluster) |> 
+      dplyr::add_count(Cluster, name = "cluster_size") |> 
       dplyr::mutate(
-        Large_cluster =dplyr::if_else(n >= large_cluster_size, Cluster, NA_character_)
+        Large_cluster = dplyr::if_else(cluster_size >= large_cluster_size, Cluster, NA_character_)
         ) |> 
-      dplyr::select(!n)
+      dplyr::select(!cluster_size)
     epi_vars = c(epi_vars, 'Large_cluster')
   }
   message(paste("Grouping var:", var1))
@@ -62,23 +63,23 @@ get_counts <- function(
   
   return(
     kleborate_data |>
-      dplyr::reframe(
-        .by = all_of(var1),
+      dplyr::reframe(  # Perform a raw and adjusted count
+        .by = all_of(var1),  # Per group (mitigates a group_by function call)
         # n = nrow(kleborate_data),
-        raw_count = dplyr::n(),
-        adj_count = dplyr::n_distinct(dplyr::across(tidyselect::all_of(adj_vars))),
+        raw_count = dplyr::n(),                                                      # Raw
+        adj_count = dplyr::n_distinct(dplyr::across(tidyselect::all_of(adj_vars))),  # Adjusted
         dplyr::across(
           tidyselect::all_of(epi_vars), n_distinct, .names = "n_{.col}"
         )
       ) |>
-      dplyr::mutate(
-        raw_prop = raw_count/sum(raw_count),
-        adj_prop = adj_count/sum(adj_count)
+      dplyr::mutate(  # Perfrom proportion calculation
+        raw_prop = raw_count/sum(raw_count),  # Raw
+        adj_prop = adj_count/sum(adj_count)   # Adjusted
       ) |>
-      dplyr::select(
+      dplyr::select(  # Re-order the cols
         tidyselect::all_of(var1), raw_count, adj_count, raw_prop, adj_prop, dplyr::everything()
       ) |>
-      dplyr::arrange(-adj_prop)
+      dplyr::arrange(-adj_prop) # Sort
   )}
 
 #' Calculate the raw and outbreak adjusted proportions of Kleborate columns
@@ -104,16 +105,16 @@ raw_adj_prop <- function(
     kleborate_data,
     grouping_vars,
     denominator = 'default',
-    adj_vars = c('Cluster', 'Site', 'Study', 'ST')
+    adj_vars = c('Cluster', 'ST')
     ){
   
   # Check args
-  if(!is_tibble(kleborate_data)){stop("kleborate_data must be a tibble")}
+  if(!is_tibble(kleborate_data)){stop(paste(base::quote(kleborate_data), "must be a tibble"))}
   if(!is.character(denominator)){stop("denominator must be a string")}
   if(denominator=='default'){denominator=grouping_vars[1]}
   for(i in c(adj_vars, grouping_vars)){
     if(!i %in% names(kleborate_data)){
-      stop(paste(i, "not in kleborate_data"))
+      stop(paste(i, "not in", base::quote(kleborate_data)))
     }
   }
 
@@ -130,15 +131,15 @@ raw_adj_prop <- function(
   
   return(
     kleborate_data |>
-      dplyr::reframe(
-        .by = tidyselect::all_of(grouping_vars),
-        raw_count = dplyr::n(),
-        adj_count = dplyr::n_distinct(across(all_of(adj_vars))),
+      dplyr::reframe(  # Perform a raw and adjusted count
+        .by = tidyselect::all_of(grouping_vars),  # Per group (mitigates a group_by function call)
+        raw_count = dplyr::n(),                                   # Raw
+        adj_count = dplyr::n_distinct(across(all_of(adj_vars))),  # Adjusted
         ) |>
-      dplyr::mutate(
-        .by = tidyselect::all_of(denominator),
-        raw_prop = raw_count/sum(raw_count),
-        adj_prop = adj_count/sum(adj_count)
+      dplyr::mutate(  # Perfrom proportion calculation
+        .by = tidyselect::all_of(denominator),  # Group by the denominator (mitigates a group_by function call)
+        raw_prop = raw_count/sum(raw_count),  # Raw
+        adj_prop = adj_count/sum(adj_count)   # Adjusted
       ) |>
       dplyr::distinct() |>
      dplyr:: arrange(-adj_count)
@@ -325,7 +326,7 @@ join_world_data <- function(
     info_cols = c("continent", "income_grp", "region_un", "subregion", "region_wb")
     ){
   if(!geo_col %in% names(kleborate_data)){
-    stop(glue::glue("{geo_col} not in kleborate_data"))
+    stop(paste(geo_col, "not in", base::quote(kleborate_data)))
   }
   ne_data = sf::st_drop_geometry(
     rnaturalearth::ne_countries(
