@@ -31,7 +31,7 @@ get_counts <- function(
   if(!is.character(var1)){stop("var1 must be a string")}
   for(i in unique(c(var1, adj_vars, epi_vars))){
     if(!i %in% names(kleborate_data)){
-      stop(paste(i, "not in kleborate_data"))
+      stop(paste(i, "not in", base::quote(kleborate_data)))
     }
   }
   if(large_cluster_size != round(large_cluster_size)){
@@ -113,7 +113,7 @@ raw_adj_prop <- function(
   if(denominator=='default'){denominator=grouping_vars[1]}
   for(i in c(adj_vars, grouping_vars)){
     if(!i %in% names(kleborate_data)){
-      stop(paste(i, "not in kleborate_data"))
+      stop(paste(i, "not in"  base::quote(kleborate_data)))
     }
   }
 
@@ -325,7 +325,7 @@ join_world_data <- function(
     info_cols = c("continent", "income_grp", "region_un", "subregion", "region_wb")
     ){
   if(!geo_col %in% names(kleborate_data)){
-    stop(glue::glue("{geo_col} not in kleborate_data"))
+    stop(paste(geo_col, "not in", base::quote(kleborate_data)))
   }
   ne_data = sf::st_drop_geometry(
     rnaturalearth::ne_countries(
