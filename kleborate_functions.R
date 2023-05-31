@@ -21,9 +21,8 @@ get_counts <- function(
     kleborate_data, 
     var1, 
     large_cluster_size = 3,
-    adj_vars=c('Cluster', 'Site', 'Study', 'ST'),
-    epi_vars = c("ST", "K_locus", "K_type", "O_locus", "O_type", "Country", 
-                  "Study", "Site", "Cluster")
+    adj_vars=c('Cluster', 'ST'),
+    epi_vars = c("ST", "K_locus", "K_type", "O_locus", "O_type", "Cluster")
 ){
   
   # Check args
@@ -106,7 +105,7 @@ raw_adj_prop <- function(
     kleborate_data,
     grouping_vars,
     denominator = 'default',
-    adj_vars = c('Cluster', 'Site', 'Study', 'ST')
+    adj_vars = c('Cluster', 'ST')
     ){
   
   # Check args
