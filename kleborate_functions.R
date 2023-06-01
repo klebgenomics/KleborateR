@@ -82,36 +82,47 @@ get_counts <- function(
       dplyr::arrange(-adj_prop) # Sort
   )}
 
-#' Calculate the raw and outbreak adjusted proportions of Kleborate columns
+#' Calculate the raw and outbreak adjusted counts and proportions for variable 
+#' combinations of interest.
+#' 
 #' @description
-#' `raw_adj_prop()` is used to calculate the raw and outbreak adjusted 
-#' proportions of multiple Kleborate columns relative to one another. For example,
-#' if grouping_vars = c('K_locus', 'ST'), the proportions are the percent of each
-#' K-locus that has a particular ST, with total/adjusted K-locus counts being
-#' the denominator ('K_locus' by default).
-#' If we wanted to reverse this, and see what proportion of each ST has a 
-#' particular K-locus, we can change the denominator to 'ST', or simply
-#' change the variable order c('ST', 'K_locus').
-#' WARNING: due to the nature of the `all_of()` function, the grouping vars
-#' must be removed from the outbreak adjustment vars, which may lead to
-#' inconsistencies in the outbreak adjustment method.
+#' `raw_adj_prop()` is used to calculate raw and outbreak-adjusted counts, stratified by 
+#' combinations of variables. The output will include counts and proportions for all 
+#' observed combinations of the grouping_vars, and adjusted proportions will use as the
+#' denominator all unique combinations of the grouping_vars AND adj_vars (which would 
+#' usually be clusters).
+#' For example, to calculate K-locus counts and frequencies per country, adjusted for
+#' outbreak clusters, we set grouping_vars=c("K_locus", "Country"), summarise_by="Country"
+#' and leave the default setting of adj_vars="Cluster" in order to produce outbreak-adjusted
+#' counts and proportions. Or, to see the frequency of STs per K-locus, we set 
+#' grouping_vars=c("K_locus", "ST"), summarise_by="K_locus".
+#' Note that all unique values for the specified variables are counted separately, and 
+#' contribute to unique variable combinations that will count as separate clusters.
+#' This means that two strains in the same cluster and country, one with K_locus='KL112' 
+#' and the other with K_locus='unknown (KL112)' will be counted as 2 distinct clusters.
+#' 
+#' WARNING: due to the nature of the `all_of()` function, var1 must be removed 
+#' from the outbreak adjustment vars, which may lead to inconsistencies in the 
+#' outbreak adjustment method.
+#' 
 #' @param kleborate_data A tibble
 #' @param grouping_vars A string vector of columns to calculate proportions for
-#' @param denominator A string referring to the column used as the proportion
-#' denominator
+#' @param summarise_by A string referring to the column used to summarise proportion
+#' denominators by
 #' @param adj_vars A string vector of columns used to perform outbreak adjustment
 #' @export
 raw_adj_prop <- function(
     kleborate_data,
-    grouping_vars,
-    denominator = 'default',
-    adj_vars = c('Cluster', 'ST')
+    grouping_vars = c("K_locus", "Country"),
+    summarise_by = "Country",
+    adj_vars = c("Cluster"),
+    clean_Klocus = F
     ){
   
   # Check args
   if(!is_tibble(kleborate_data)){stop(paste(base::quote(kleborate_data), "must be a tibble"))}
-  if(!is.character(denominator)){stop("denominator must be a string")}
-  if(denominator=='default'){denominator=grouping_vars[1]}
+  if(!is.character(summarise_by)){stop("summarise_by must be a string (variable name)")}
+  if(summarise_by=='default'){summarise_by=grouping_vars[1]}
   for(i in c(adj_vars, grouping_vars)){
     if(!i %in% names(kleborate_data)){
       stop(paste(i, "not in", base::quote(kleborate_data)))
@@ -126,8 +137,15 @@ raw_adj_prop <- function(
       }
   }
   message(paste("Grouping vars:", paste(grouping_vars, collapse = ", ")))
-  message(paste("Denominator:", denominator))
+  message(paste("Summarising by:", summarise_by))
   message(paste("Adj vars:", paste(adj_vars, collapse = ", ")))
+  
+  if (clean_Klocus){
+  	kleborate_data <- kleborate_data %>%
+  		mutate(K_locus = str_replace(K_locus, "unknown \\(KL107\\)", "unknown")) %>%
+  		mutate(K_locus = str_replace(K_locus, "unknown \\(", "")) %>%
+  		mutate(K_locus = str_replace(K_locus, "\\)", ""))
+  }
   
   return(
     kleborate_data |>
@@ -137,7 +155,7 @@ raw_adj_prop <- function(
         adj_count = dplyr::n_distinct(across(all_of(adj_vars))),  # Adjusted
         ) |>
       dplyr::mutate(  # Perfrom proportion calculation
-        .by = tidyselect::all_of(denominator),  # Group by the denominator (mitigates a group_by function call)
+        .by = tidyselect::all_of(summarise_by),  # Group by the summary variable (mitigates a group_by function call)
         raw_prop = raw_count/sum(raw_count),  # Raw
         adj_prop = adj_count/sum(adj_count)   # Adjusted
       ) |>

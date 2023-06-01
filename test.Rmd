@@ -34,14 +34,31 @@ data <- data %>% left_join(country)
 # load kleborate processing functions
 source('https://raw.githubusercontent.com/klebgenomics/KleborateR/main/kleborate_functions.R')
 
-get_counts(data, "K_locus", adj_vars=c("Cluster", "ST"), epi_vars=c("ST", "K_locus", "K_type", "O_locus", "O_type", "Country", "Cluster"))
+source('https://raw.githubusercontent.com/klebgenomics/KleborateR/main/plotting_functions.R')
 
-raw_adj_prop(data, c("ST", "K_locus"), adj_vars = c('Cluster', 'ST'))
 ```
 
 ``` {r}
-source('https://raw.githubusercontent.com/klebgenomics/KleborateR/main/plotting_functions.R')
+# to get K locus frequency per country, adjusting for clustering...
+# we set grouping_vars = c("Country", "K_locus")
+#        denominator = "Country"
+#        adj_vars="Cluster"
+raw_adj_prop(data, grouping_vars = c("Country", "K_locus"), adj_vars = c("Cluster"), summarise_by = "Country")
 
-get_counts(data, "O_locus", adj_vars=c("Cluster", "ST"), epi_vars=c("ST", "K_locus", "K_type", "O_locus", "O_type", "Country", "Cluster")) |> plot_raw_adj_pyramid()
+# if we include site as a grouping variable, we break down some clusters into multiple sites, they are then counted as separate clusters which increases the denominator - ie denominator is number of unique K/Site/clusters per Country, not correct to say the denominator is 'country'
+raw_adj_prop(data, grouping_vars = c("Country", "K_locus", "Site"), adj_vars = c("Cluster"), summarise_by = "Country")
+
+# Note that all unique values for the specified variables are counted separately, and 
+# contribute to unique variable combinations that will count as separate clusters.
+# This means that two strains in the same cluster and country, one with K_locus='KL112' 
+# and the other with K_locus='unknown (KL112)' will be counted as 2 distinct clusters.
+# THIS SHOULD BE REVIEWED, e.g. strip 'unknown ()' to ignore confidence, except for
+# unknown (KL107) which is truly uncallable.
 ```
 
+``` {r}
+# load kleborate processing functions
+source('https://raw.githubusercontent.com/klebgenomics/KleborateR/development/testing_ground.R')
+
+# in weighting_country_and_study, country_proportions currently counts the number of unique combinations of (country/study/K) and weights the country proportional to that... not sure that is right?
+```
