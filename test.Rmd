@@ -119,3 +119,39 @@ barnards_adj_site %>%
 # As we want to combine our estimates across studies, some of which will have multiple sites, so we need a study*site variable, that is used as our studlab
 
 ```
+
+``` {r}
+# now need to work out how to pull the key elements from the metaprop object, to plot in the app
+site_est <- barnards_adj_site %>% 
+    filter(K_locus=="KL62") %>% 
+    metaprop(event=raw_count, n=raw_sum, studlab=Site,  subgroup=Country,
+             method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE)
+
+# this gives a dataframe with the individual site values, but not pooled subgroup or overall estimates
+as.data.frame(site_est)
+
+# this gives the pooled estimates and 95% CIs per subgroup (ie country) 
+site_est$TE.random.w
+site_est$lower.random.w
+site_est$upper.random.w
+
+# but they are logit transformed and need to be transformed back
+1/(1+exp(-1*site_est$TE.random.w))
+1/(1+exp(-1*site_est$lower.random.w))
+1/(1+exp(-1*site_est$upper.random.w))
+
+# labels for these subgroup vectors
+site_est$subgroup.levels
+
+# overall pooled effect and 95% CI
+1/(1+exp(-1*site_est$TE.random))
+1/(1+exp(-1*site_est$lower.random))
+1/(1+exp(-1*site_est$upper.random))
+
+
+# note we should try using method = "Inverse" instead of method = "GLMM"
+site_est2 <- barnards_adj_site %>% 
+    filter(K_locus=="KL62") %>% 
+    metaprop(event=raw_count, n=raw_sum, studlab=Site,  subgroup=Country,
+             method = "Inverse", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE)
+```
