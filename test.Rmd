@@ -32,7 +32,7 @@ data <- data %>% left_join(country)
 
 ``` {r}
 # load kleborate processing functions
-source('https://raw.githubusercontent.com/klebgenomics/KleborateR/development/kleborate_functions.R')
+source('kleborate_functions.R')
 
 ```
 
