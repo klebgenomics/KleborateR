@@ -41,7 +41,7 @@ source('https://raw.githubusercontent.com/klebgenomics/KleborateR/main/plotting_
 ``` {r}
 # to get K locus frequency per country, adjusting for clustering...
 # we set grouping_vars = c("Country", "K_locus")
-#        denominator = "Country"
+#        summarise_by = "Country"
 #        adj_vars="Cluster"
 raw_adj_prop(data, grouping_vars = c("Country", "K_locus"), adj_vars = c("Cluster"), summarise_by = "Country")
 
@@ -54,6 +54,9 @@ raw_adj_prop(data, grouping_vars = c("Country", "K_locus", "Site"), adj_vars = c
 # and the other with K_locus='unknown (KL112)' will be counted as 2 distinct clusters.
 # THIS SHOULD BE REVIEWED, e.g. strip 'unknown ()' to ignore confidence, except for
 # unknown (KL107) which is truly uncallable.
+
+# solution implemented, can switch on by setting clean_Klocus = T
+raw_adj_prop(data, grouping_vars = c("Country", "K_locus"), adj_vars = c("Cluster"), summarise_by = "Country", clean_Klocus = T)
 ```
 
 ``` {r}
@@ -61,4 +64,42 @@ raw_adj_prop(data, grouping_vars = c("Country", "K_locus", "Site"), adj_vars = c
 source('https://raw.githubusercontent.com/klebgenomics/KleborateR/development/testing_ground.R')
 
 # in weighting_country_and_study, country_proportions currently counts the number of unique combinations of (country/study/K) and weights the country proportional to that... not sure that is right?
+```
+
+``` {r}
+library(meta)
+
+# pooled estimate for K locus prevalence, across countries
+# based on https://bookdown.org/MathiasHarrer/Doing_Meta_Analysis_in_R/pooling-es.html#pooling-props
+
+barnards_adj <- raw_adj_prop(data, grouping_vars = c("Country", "K_locus"), adj_vars = c("Cluster"), summarise_by = "Country", clean_Klocus = T)
+
+# test with one K locus that was found in all countries, KL62
+barnards_adj_KL62 <- barnards_adj %>% filter(K_locus=="KL62")
+
+metaprop(event=raw_count, n=raw_sum, studlab=Country, data=barnards_adj_KL62, 
+         method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE)
+
+# adjust across sites, for country=Nigeria
+barnards_adj_site <- raw_adj_prop(data, grouping_vars = c("Country", "K_locus", "Site"), adj_vars = c("Cluster"), summarise_by = "Site", clean_Klocus = T)
+
+barnards_adj_site_Nigeria <- barnards_adj_site %>% filter(Country=="Nigeria")
+
+barnards_adj_site_Nigeria_KL62 <- barnards_adj_site_Nigeria %>% filter(K_locus=="KL62")
+
+metaprop(event=raw_count, n=raw_sum, studlab=Site, data=barnards_adj_site_Nigeria_KL62, 
+         method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE)
+
+# note I2 is high, indicating 81.3% of variation is due to between-site heterogeneity.. not surprising as one site had only n=4 isolates and one had n=37
+
+# from the book above: There are no iron-clad rules determining when exactly further analyses of the between-study heterogeneity are warranted. An approach that is sometimes used in practice is to check for outliers and influential cases when I2 is greater than 50%. When this threshold is reached, we can assume at least moderate heterogeneity, and that (more than) half of the variation is due to true effect size differences.
+
+barnards_adj_site_Nigeria_KL116 <- barnards_adj_site_Nigeria %>% filter(K_locus=="KL116")
+
+metaprop(event=raw_count, n=raw_sum, studlab=Site, data=barnards_adj_site_Nigeria_KL116, 
+         method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE)
+
+# this one has I2=16.4%, which is much lower, makes sense as these are a different 2 sites, one with n=37 and one with n=16
+# this highlights a problem with using the grouped data frame, as 0's are not included, ie we are not seeing that there are 0/4 KL116 at site NW
+
 ```
