@@ -608,6 +608,114 @@ barnards_adj_site %&gt;%
 <pre class="r"><code># we could similarly use subgroups to pool sites across regions
 
 # As we want to combine our estimates across studies, some of which will have multiple sites, so we need a study*site variable, that is used as our studlab</code></pre>
+<pre class="r"><code># now need to work out how to pull the key elements from the metaprop object, to plot in the app
+site_est &lt;- barnards_adj_site %&gt;% 
+    filter(K_locus==&quot;KL62&quot;) %&gt;% 
+    metaprop(event=raw_count, n=raw_sum, studlab=Site,  subgroup=Country,
+             method = &quot;GLMM&quot;, sm = &quot;PLOGIT&quot;, fixed = FALSE, random = TRUE, method.random.ci = TRUE)</code></pre>
+<pre><code>## Warning in sqrt(object$devResid()): NaNs produced</code></pre>
+<pre><code>## Warning in vcov.merMod(res.ML): variance-covariance matrix computed from finite-difference Hessian is
+## not positive definite or contains NA values: falling back to var-cov estimated from RX</code></pre>
+<pre><code>## Warning: Ratio of largest to smallest sampling variance extremely large. May not
+## be able to obtain stable results.
+
+## Warning: Ratio of largest to smallest sampling variance extremely large. May not
+## be able to obtain stable results.
+
+## Warning: Ratio of largest to smallest sampling variance extremely large. May not
+## be able to obtain stable results.
+
+## Warning: Ratio of largest to smallest sampling variance extremely large. May not
+## be able to obtain stable results.</code></pre>
+<pre class="r"><code># this gives a dataframe with the individual site values, but not pooled subgroup or overall estimates
+as.data.frame(site_est)</code></pre>
+<pre><code>##    event  n incr.event studlab         TE      seTE statistic pval df
+## 1      0 17        0.5      BC -3.5553481 1.4342743        NA   NA NA
+## 2      0  2        0.5      BK -1.6094379 1.5491933        NA   NA NA
+## 3      2 95        0.0      ES -3.8394523 0.7146696        NA   NA NA
+## 4      1  5        0.0      IN -1.3862944 1.1180340        NA   NA NA
+## 5      0 16        0.5      NK -3.4965076 1.4354811        NA   NA NA
+## 6      2 37        0.0      NN -2.8622009 0.7270292        NA   NA NA
+## 7      2  4        0.0      NW  0.0000000 1.0000000        NA   NA NA
+## 8      0  2        0.5      PC -1.6094379 1.5491933        NA   NA NA
+## 9      0 42        0.5      PP -4.4426513 1.4225081        NA   NA NA
+## 10     3 15        0.0      RK -1.3862944 0.6454972        NA   NA NA
+## 11     1  7        0.0      RU -1.7917595 1.0801234        NA   NA NA
+## 12     7 16        0.0     ZAT -0.2513144 0.5039526        NA   NA NA
+##          lower      upper w.common w.random zval w.fixed     subgroup
+## 1  0.000000000 0.19506432       NA       NA   NA      NA   Bangladesh
+## 2  0.000000000 0.84188612       NA       NA   NA      NA   Bangladesh
+## 3  0.002559818 0.07398655       NA       NA   NA      NA     Ethiopia
+## 4  0.005050763 0.71641794       NA       NA   NA      NA        India
+## 5  0.000000000 0.20590721       NA       NA   NA      NA      Nigeria
+## 6  0.006614570 0.18194912       NA       NA   NA      NA      Nigeria
+## 7  0.067585986 0.93241401       NA       NA   NA      NA      Nigeria
+## 8  0.000000000 0.84188612       NA       NA   NA      NA     Pakistan
+## 9  0.000000000 0.08408385       NA       NA   NA      NA     Pakistan
+## 10 0.043312005 0.48089113       NA       NA   NA      NA       Rwanda
+## 11 0.003610297 0.57872320       NA       NA   NA      NA       Rwanda
+## 12 0.197534141 0.70122310       NA       NA   NA      NA South Africa
+##           byvar
+## 1    Bangladesh
+## 2    Bangladesh
+## 3      Ethiopia
+## 4         India
+## 5       Nigeria
+## 6       Nigeria
+## 7       Nigeria
+## 8      Pakistan
+## 9      Pakistan
+## 10       Rwanda
+## 11       Rwanda
+## 12 South Africa</code></pre>
+<pre class="r"><code># this gives the pooled estimates and 95% CIs per subgroup (ie country) 
+site_est$TE.random.w</code></pre>
+<pre><code>##   Bangladesh     Ethiopia        India      Nigeria     Pakistan       Rwanda 
+##  -24.9462866   -3.8394523   -1.3862944   -2.5599810  -26.5059801   -1.5040774 
+## South Africa 
+##   -0.2513144</code></pre>
+<pre class="r"><code>site_est$lower.random.w</code></pre>
+<pre><code>##    Bangladesh      Ethiopia         India       Nigeria      Pakistan 
+## -7.126781e+04 -5.240179e+00 -3.577601e+00 -7.458193e+00 -1.021381e+05 
+##        Rwanda  South Africa 
+## -8.527696e+00 -1.239043e+00</code></pre>
+<pre class="r"><code>site_est$upper.random.w</code></pre>
+<pre><code>##    Bangladesh      Ethiopia         India       Nigeria      Pakistan 
+##  7.121791e+04 -2.438726e+00  8.050120e-01  2.338231e+00  1.020851e+05 
+##        Rwanda  South Africa 
+##  5.519541e+00  7.364138e-01</code></pre>
+<pre class="r"><code># but they are logit transformed and need to be transformed back
+1/(1+exp(-1*site_est$TE.random.w))</code></pre>
+<pre><code>##   Bangladesh     Ethiopia        India      Nigeria     Pakistan       Rwanda 
+## 1.465431e-11 2.105263e-02 2.000000e-01 7.175881e-02 3.080343e-12 1.818182e-01 
+## South Africa 
+## 4.375000e-01</code></pre>
+<pre class="r"><code>1/(1+exp(-1*site_est$lower.random.w))</code></pre>
+<pre><code>##   Bangladesh     Ethiopia        India      Nigeria     Pakistan       Rwanda 
+## 0.0000000000 0.0052713733 0.0271830925 0.0005763648 0.0000000000 0.0001978713 
+## South Africa 
+## 0.2246026775</code></pre>
+<pre class="r"><code>1/(1+exp(-1*site_est$upper.random.w))</code></pre>
+<pre><code>##   Bangladesh     Ethiopia        India      Nigeria     Pakistan       Rwanda 
+##   1.00000000   0.08026694   0.69104557   0.91199422   1.00000000   0.99600831 
+## South Africa 
+##   0.67621115</code></pre>
+<pre class="r"><code># labels for these subgroup vectors
+site_est$subgroup.levels</code></pre>
+<pre><code>## [1] &quot;Bangladesh&quot;   &quot;Ethiopia&quot;     &quot;India&quot;        &quot;Nigeria&quot;      &quot;Pakistan&quot;    
+## [6] &quot;Rwanda&quot;       &quot;South Africa&quot;</code></pre>
+<pre class="r"><code># overall pooled effect and 95% CI
+1/(1+exp(-1*site_est$TE.random))</code></pre>
+<pre><code>## [1] 0.05897047</code></pre>
+<pre class="r"><code>1/(1+exp(-1*site_est$lower.random))</code></pre>
+<pre><code>## [1] 0.01550342</code></pre>
+<pre class="r"><code>1/(1+exp(-1*site_est$upper.random))</code></pre>
+<pre><code>## [1] 0.1995985</code></pre>
+<pre class="r"><code># note we should try using method = &quot;Inverse&quot; instead of method = &quot;GLMM&quot;
+site_est2 &lt;- barnards_adj_site %&gt;% 
+    filter(K_locus==&quot;KL62&quot;) %&gt;% 
+    metaprop(event=raw_count, n=raw_sum, studlab=Site,  subgroup=Country,
+             method = &quot;Inverse&quot;, sm = &quot;PLOGIT&quot;, fixed = FALSE, random = TRUE, method.random.ci = TRUE)</code></pre>
 </div>
 
 
