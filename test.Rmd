@@ -101,5 +101,44 @@ metaprop(event=raw_count, n=raw_sum, studlab=Site, data=barnards_adj_site_Nigeri
 
 # this one has I2=16.4%, which is much lower, makes sense as these are a different 2 sites, one with n=37 and one with n=16
 # this highlights a problem with using the grouped data frame, as 0's are not included, ie we are not seeing that there are 0/4 KL116 at site NW
+# let's fix this
+
+barnards_adj_site_sums <- barnards_adj_site %>% select(Site, raw_sum, adj_sum) %>% unique()
+  
+barnards_adj_site_Nigeria <- barnards_adj_site_Nigeria %>%
+  select(-c(raw_sum, adj_sum)) %>%
+  complete(Site, K_locus, Country, fill=list(raw_count=0, adj_count=0, raw_prop=0, adj_prop=0)) %>%
+  left_join(barnards_adj_site_sums)
+
+barnards_adj_site_Nigeria %>% 
+  filter(K_locus=="KL116") %>% 
+  metaprop(event=raw_count, n=raw_sum, studlab=Site,  
+  method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE)
+
+barnards_adj_site_Nigeria %>% 
+  filter(K_locus=="KL62") %>% 
+  metaprop(event=raw_count, n=raw_sum, studlab=Site,  
+  method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE)
+
+# note we can plot the estimates also
+barnards_adj_site_Nigeria %>% 
+  filter(K_locus=="KL62") %>% 
+  metaprop(event=raw_count, n=raw_sum, studlab=Site,  
+  method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE) %>%
+  forest.meta()
+
+barnards_adj_site %>% 
+  filter(K_locus=="KL62") %>% 
+  metaprop(event=raw_count, n=raw_sum, studlab=Site,  
+  method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE) %>%
+  forest.meta()
+
+# this layout prints the N values as well as estimates and CIs
+barnards_adj %>% 
+  filter(K_locus=="KL62") %>% 
+  metaprop(event=raw_count, n=raw_sum, studlab=Country,  
+  method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE) %>%
+  forest.meta(layout="RevMan5")
+
 
 ```
