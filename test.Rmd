@@ -32,9 +32,7 @@ data <- data %>% left_join(country)
 
 ``` {r}
 # load kleborate processing functions
-source('https://raw.githubusercontent.com/klebgenomics/KleborateR/main/kleborate_functions.R')
-
-source('https://raw.githubusercontent.com/klebgenomics/KleborateR/main/plotting_functions.R')
+source('https://raw.githubusercontent.com/klebgenomics/KleborateR/development/kleborate_functions.R')
 
 ```
 
@@ -60,13 +58,6 @@ raw_adj_prop(data, grouping_vars = c("Country", "K_locus"), adj_vars = c("Cluste
 ```
 
 ``` {r}
-# load kleborate processing functions
-source('https://raw.githubusercontent.com/klebgenomics/KleborateR/development/testing_ground.R')
-
-# in weighting_country_and_study, country_proportions currently counts the number of unique combinations of (country/study/K) and weights the country proportional to that... not sure that is right?
-```
-
-``` {r}
 library(meta)
 
 # pooled estimate for K locus prevalence, across countries
@@ -74,71 +65,57 @@ library(meta)
 
 barnards_adj <- raw_adj_prop(data, grouping_vars = c("Country", "K_locus"), adj_vars = c("Cluster"), summarise_by = "Country", clean_Klocus = T)
 
-# test with one K locus that was found in all countries, KL62
-barnards_adj_KL62 <- barnards_adj %>% filter(K_locus=="KL62")
-
-metaprop(event=raw_count, n=raw_sum, studlab=Country, data=barnards_adj_KL62, 
-         method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE)
-
-# adjust across sites, for country=Nigeria
-barnards_adj_site <- raw_adj_prop(data, grouping_vars = c("Country", "K_locus", "Site"), adj_vars = c("Cluster"), summarise_by = "Site", clean_Klocus = T)
-
-barnards_adj_site_Nigeria <- barnards_adj_site %>% filter(Country=="Nigeria")
-
-barnards_adj_site_Nigeria_KL62 <- barnards_adj_site_Nigeria %>% filter(K_locus=="KL62")
-
-metaprop(event=raw_count, n=raw_sum, studlab=Site, data=barnards_adj_site_Nigeria_KL62, 
-         method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE)
-
-# note I2 is high, indicating 81.3% of variation is due to between-site heterogeneity.. not surprising as one site had only n=4 isolates and one had n=37
-
-# from the book above: There are no iron-clad rules determining when exactly further analyses of the between-study heterogeneity are warranted. An approach that is sometimes used in practice is to check for outliers and influential cases when I2 is greater than 50%. When this threshold is reached, we can assume at least moderate heterogeneity, and that (more than) half of the variation is due to true effect size differences.
-
-barnards_adj_site_Nigeria_KL116 <- barnards_adj_site_Nigeria %>% filter(K_locus=="KL116")
-
-metaprop(event=raw_count, n=raw_sum, studlab=Site, data=barnards_adj_site_Nigeria_KL116, 
-         method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE)
-
-# this one has I2=16.4%, which is much lower, makes sense as these are a different 2 sites, one with n=37 and one with n=16
-# this highlights a problem with using the grouped data frame, as 0's are not included, ie we are not seeing that there are 0/4 KL116 at site NW
-# let's fix this
-
-barnards_adj_site_sums <- barnards_adj_site %>% select(Site, raw_sum, adj_sum) %>% unique()
+barnards_adj_country_sums <- barnards_adj %>% select(Country, raw_sum, adj_sum) %>% unique()
   
-barnards_adj_site_Nigeria <- barnards_adj_site_Nigeria %>%
+barnards_adj <- barnards_adj %>%
   select(-c(raw_sum, adj_sum)) %>%
-  complete(Site, K_locus, Country, fill=list(raw_count=0, adj_count=0, raw_prop=0, adj_prop=0)) %>%
-  left_join(barnards_adj_site_sums)
+  complete(K_locus, Country, fill=list(raw_count=0, adj_count=0, raw_prop=0, adj_prop=0)) %>%
+  left_join(barnards_adj_country_sums)
 
-barnards_adj_site_Nigeria %>% 
-  filter(K_locus=="KL116") %>% 
-  metaprop(event=raw_count, n=raw_sum, studlab=Site,  
-  method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE)
-
-barnards_adj_site_Nigeria %>% 
-  filter(K_locus=="KL62") %>% 
-  metaprop(event=raw_count, n=raw_sum, studlab=Site,  
-  method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE)
-
-# note we can plot the estimates also
-barnards_adj_site_Nigeria %>% 
-  filter(K_locus=="KL62") %>% 
-  metaprop(event=raw_count, n=raw_sum, studlab=Site,  
-  method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE) %>%
-  forest.meta()
-
-barnards_adj_site %>% 
-  filter(K_locus=="KL62") %>% 
-  metaprop(event=raw_count, n=raw_sum, studlab=Site,  
-  method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE) %>%
-  forest.meta()
-
-# this layout prints the N values as well as estimates and CIs
+# test with one K locus that was found in all countries, KL62
 barnards_adj %>% 
   filter(K_locus=="KL62") %>% 
   metaprop(event=raw_count, n=raw_sum, studlab=Country,  
   method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE) %>%
   forest.meta(layout="RevMan5")
 
+# from the book above: There are no iron-clad rules determining when exactly further analyses of the between-study heterogeneity are warranted. An approach that is sometimes used in practice is to check for outliers and influential cases when I2 is greater than 50%. When this threshold is reached, we can assume at least moderate heterogeneity, and that (more than) half of the variation is due to true effect size differences.
+
+```
+
+``` {r}
+
+# pool estimates across sites
+barnards_adj_site <- raw_adj_prop(data, grouping_vars = c("Country", "K_locus", "Site"), adj_vars = c("Cluster"), summarise_by = "Site", clean_Klocus = T)
+
+barnards_adj_site_sums <- barnards_adj_site %>% select(Site, Country, raw_sum, adj_sum) %>% unique()
+  
+barnards_adj_site <- barnards_adj_site %>%
+  select(-c(raw_sum, adj_sum, Country)) %>%
+  complete(Site, K_locus, fill=list(raw_count=0, adj_count=0, raw_prop=0, adj_prop=0)) %>%
+  left_join(barnards_adj_site_sums)
+
+barnards_adj_site %>% 
+  filter(K_locus=="KL116") %>% 
+  metaprop(event=raw_count, n=raw_sum, studlab=Site,  subgroup=Country,
+  method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE) %>%
+  forest.meta(layout="RevMan5")
+
+barnards_adj_site %>% 
+  filter(K_locus=="KL62") %>% 
+  metaprop(event=raw_count, n=raw_sum, studlab=Site,  subgroup=Country,
+  method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE) %>%
+  forest.meta(layout="RevMan5")
+
+# plot only the subgroup estimates (ie country effects, pooled across sites) and total estimate, not individual sites
+barnards_adj_site %>% 
+    filter(K_locus=="KL62") %>% 
+    metaprop(event=raw_count, n=raw_sum, studlab=Site,  subgroup=Country,
+             method = "GLMM", sm = "PLOGIT", fixed = FALSE, random = TRUE, method.random.ci = TRUE) %>%
+    forest.meta(layout="RevMan5", study.results=F)
+
+# we could similarly use subgroups to pool sites across regions
+
+# As we want to combine our estimates across studies, some of which will have multiple sites, so we need a study*site variable, that is used as our studlab
 
 ```

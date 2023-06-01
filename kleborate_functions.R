@@ -157,7 +157,9 @@ raw_adj_prop <- function(
       dplyr::mutate(  # Perfrom proportion calculation
         .by = tidyselect::all_of(summarise_by),  # Group by the summary variable (mitigates a group_by function call)
         raw_prop = raw_count/sum(raw_count),  # Raw
-        adj_prop = adj_count/sum(adj_count)   # Adjusted
+        adj_prop = adj_count/sum(adj_count),   # Adjusted
+        raw_sum = sum(raw_count),
+        adj_sum = sum(adj_count)
       ) |>
       dplyr::distinct() |>
      dplyr:: arrange(-adj_count)
