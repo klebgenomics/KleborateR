@@ -53,8 +53,8 @@ raw_adj_prop(data, grouping_vars = c("Country", "K_locus", "Site"), adj_vars = c
 # THIS SHOULD BE REVIEWED, e.g. strip 'unknown ()' to ignore confidence, except for
 # unknown (KL107) which is truly uncallable.
 
-# solution implemented, can switch on by setting clean_Klocus = T
-raw_adj_prop(data, grouping_vars = c("Country", "K_locus"), adj_vars = c("Cluster"), summarise_by = "Country", clean_Klocus = T)
+# solution implemented
+raw_adj_prop(data, grouping_vars = c("Country", "K_locus"), adj_vars = c("Cluster"), summarise_by = "Country")
 
 # check if filtering on genome quality first fixes things
 # klebnet GSP criteria
@@ -62,7 +62,7 @@ raw_adj_prop(data, grouping_vars = c("Country", "K_locus"), adj_vars = c("Cluste
 
 data %>% 
 genome_filter() %>% 
-raw_adj_prop(grouping_vars = c("K_locus", "Country"), summarise_by = "Country", adj_vars = c("Cluster", "Site"), clean_Klocus=T)
+raw_adj_prop(grouping_vars = c("K_locus", "Country"), summarise_by = "Country", adj_vars = c("Cluster", "Site"))
 
 # note this only removes n=3 genomes in this case
 

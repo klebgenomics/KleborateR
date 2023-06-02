@@ -21,7 +21,7 @@ get_counts <- function(
     kleborate_data, 
     var1, 
     large_cluster_size = 3,
-    adj_vars=c('Cluster', 'ST'),
+    adj_vars=c('Cluster', 'Site', 'Country'),
     epi_vars = c("ST", "K_locus", "K_type", "O_locus", "O_type", "Cluster")
 ){
   
@@ -60,7 +60,15 @@ get_counts <- function(
   message(paste("Grouping var:", var1))
   message(paste("Epi vars:", paste(epi_vars, collapse = ", ")))
   message(paste("Adj vars:", paste(adj_vars, collapse = ", ")))
-  
+
+  #if ("K_locus" %in% var1){
+  	kleborate_data <- kleborate_data %>%
+  		filter(K_locus != "unknown (KL107)") %>%
+  		filter(!(K_locus =="KL107" & K_locus_confidence=="None")) %>%
+  		mutate(K_locus = str_replace(K_locus, "unknown \\(", "")) %>%
+  		mutate(K_locus = str_replace(K_locus, "\\)", ""))
+ # }
+    
   return(
     kleborate_data |>
       dplyr::reframe(  # Perform a raw and adjusted count
@@ -115,8 +123,7 @@ raw_adj_prop <- function(
     kleborate_data,
     grouping_vars = c("K_locus", "Country"),
     summarise_by = "Country",
-    adj_vars = c("Cluster"),
-    clean_Klocus = F
+    adj_vars = c("Cluster")
     ){
   
   # Check args
@@ -140,12 +147,13 @@ raw_adj_prop <- function(
   message(paste("Summarising by:", summarise_by))
   message(paste("Adj vars:", paste(adj_vars, collapse = ", ")))
   
-  if (clean_Klocus){
+  #if ("K_locus" %in% grouping_vars){
   	kleborate_data <- kleborate_data %>%
   		filter(K_locus != "unknown (KL107)") %>%
+  		filter(!(K_locus =="KL107" & K_locus_confidence=="None")) %>%
   		mutate(K_locus = str_replace(K_locus, "unknown \\(", "")) %>%
   		mutate(K_locus = str_replace(K_locus, "\\)", ""))
-  }
+  #}
   
   return(
     kleborate_data |>
