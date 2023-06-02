@@ -142,7 +142,7 @@ raw_adj_prop <- function(
   
   if (clean_Klocus){
   	kleborate_data <- kleborate_data %>%
-  		mutate(K_locus = str_replace(K_locus, "unknown \\(KL107\\)", "unknown")) %>%
+  		filter(K_locus != "unknown (KL107)") %>%
   		mutate(K_locus = str_replace(K_locus, "unknown \\(", "")) %>%
   		mutate(K_locus = str_replace(K_locus, "\\)", ""))
   }
@@ -163,12 +163,15 @@ raw_adj_prop <- function(
       ) |>
       dplyr::distinct() |>
      dplyr:: arrange(-adj_count)
-  )} 
+  )}  
+
 
 #' Filter genomes in a Kleborate output tibble
 #' @description
 #' `genome_filter()` removes undesirable genomes from Kleborate results
 #' using pre-defined parameters that can be tweaked.
+#' Defaults for contig count and genome size are those set by KlebNET GSP, see
+#' https://bigsdb.pasteur.fr/klebsiella/genome-quality-check/
 #' @param kleborate_data A tibble
 #' @param species A string vector of species to keep
 #' @param k_typable Logical to drop K-locus confidence calls of "Low" and "None"
@@ -180,11 +183,11 @@ raw_adj_prop <- function(
 genome_filter <- function(
     kleborate_data, 
     species = c("Klebsiella pneumoniae"), 
-    k_typable=TRUE, 
+    k_typable=FALSE, 
     o_typable=TRUE,
-    max_contigs=275, 
-    max_size=6500000,
-    min_size=2500000
+    max_contigs=500, 
+    max_size=6200000,
+    min_size=5000000
     ){
   # Check args
   if(!is_tibble(kleborate_data)){stop("kleborate_data must be a tibble")}

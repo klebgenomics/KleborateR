@@ -55,15 +55,26 @@ raw_adj_prop(data, grouping_vars = c("Country", "K_locus", "Site"), adj_vars = c
 
 # solution implemented, can switch on by setting clean_Klocus = T
 raw_adj_prop(data, grouping_vars = c("Country", "K_locus"), adj_vars = c("Cluster"), summarise_by = "Country", clean_Klocus = T)
+
+# check if filtering on genome quality first fixes things
+# klebnet GSP criteria
+# https://bigsdb.pasteur.fr/klebsiella/genome-quality-check/
+
+data %>% 
+genome_filter() %>% 
+raw_adj_prop(grouping_vars = c("K_locus", "Country"), summarise_by = "Country", adj_vars = c("Cluster", "Site"), clean_Klocus=T)
+
+# note this only removes n=3 genomes in this case
+
 ```
 
 ``` {r}
-library(meta)
 
 # pooled estimate for K locus prevalence, across countries
 # based on https://bookdown.org/MathiasHarrer/Doing_Meta_Analysis_in_R/pooling-es.html#pooling-props
 
-barnards_adj <- raw_adj_prop(data, grouping_vars = c("Country", "K_locus"), adj_vars = c("Cluster"), summarise_by = "Country", clean_Klocus = T)
+barnards_adj <- genome_filter(data) %>% 
+  raw_adj_prop(grouping_vars = c("Country", "K_locus"), adj_vars = c("Cluster"), summarise_by = "Country", clean_Klocus = T)
 
 barnards_adj_country_sums <- barnards_adj %>% select(Country, raw_sum, adj_sum) %>% unique()
   
@@ -84,9 +95,11 @@ barnards_adj %>%
 ```
 
 ``` {r}
+library(meta)
 
 # pool estimates across sites
-barnards_adj_site <- raw_adj_prop(data, grouping_vars = c("Country", "K_locus", "Site"), adj_vars = c("Cluster"), summarise_by = "Site", clean_Klocus = T)
+barnards_adj_site <- genome_filter(data) %>% 
+  raw_adj_prop(grouping_vars = c("Country", "K_locus", "Site"), adj_vars = c("Cluster"), summarise_by = "Site", clean_Klocus = T)
 
 barnards_adj_site_sums <- barnards_adj_site %>% select(Site, Country, raw_sum, adj_sum) %>% unique()
   
