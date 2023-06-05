@@ -1,4 +1,5 @@
 require(tidyverse)
+require(jsonlite)
 
 #' quant_kaptive_genes
 #' @description
@@ -18,7 +19,7 @@ quant_kaptive_genes <- function(
   return(
     stringr::str_split(genes_column, delim, simplify = TRUE) |>
       tibble::as_tibble() |>
-      tidyr::pivot_longer(cols=everything()) |>
+      tidyr::pivot_longer(cols=dplyr::everything()) |>
       dplyr::pull(value) %>%
       stringr::str_split_fixed("_", n=3) |>
       tibble::as_tibble() %>%
@@ -89,5 +90,67 @@ quant_missing_genes <- function(
       dplyr::distinct() |>
       dplyr::arrange(-total_missing_gene)
     )
+}
+
+### Kaptive gene colours
+kaptive_gene_colours <- list(
+  "Core genes" = "#0c7fb8",
+  "Initiating glycosyltransferase" = "#17a658",
+  "Other sugar synthesis and processing" = "#a0cc91",
+  "Flippase" = "#dc4b43",
+  "Rhamonse synthesis and processing" = "#C6B3D3",
+  "Mannose synthesis and processing" = "#643F95",
+  "Capsule repeat unit polymerase" = "#e68747",
+  "Hypothetical/unknown protein" = "#898a8b",
+  "Transposase" = "#ffffff")
+
+
+# Kaptive JSON-parsing Functions
+parse_kaptive_json <- function(json_file_path){
+  if(fs::file_exists(json_file_path) == FALSE){
+    stop(paste("ERROR:", json_file_path, "does not exist"))
+  } else {
+    return(jsonlite::fromJSON(json_file_path))
   }
+}
+
+get_locus_pieces <- function(kaptive_json){
+  kaptive_json = dplyr::if_else(fs::is_file(kaptive_json),
+                                parse_kaptive_json(kaptive_json), kaptive_json)
+  tibble::tibble(
+    "Assembly" = kaptive_json$`Assembly name`,
+    "N_pieces" = sapply(kaptive_json$`blastn result`$`Locus assembly pieces`, nrow)
+    )
+  }
+
+### Function to return a list of locus piece fastas for each assembly
+get_locus_fasta <- function(kaptive_json) {
+  kaptive_json = dplyr::if_else(fs::is_file(kaptive_json),
+                                parse_kaptive_json(kaptive_json), kaptive_json)
+  kaptive_json$`blastn result`$`Locus assembly pieces` |>
+    purr::map(
+      ~dplyr::mutate(.x, fasta = paste(
+        paste0(">",
+               paste(
+                 `Contig name`,
+                 `Contig start position`,
+                 `Contig end position`,
+                 `Contig strand`,
+                 sep = "_")),
+        Sequence, sep="\n")) |>
+        dplyr::pull(fasta))
+}
+
+kaptive_json_to_table <- function(kaptive_json) {
+  kaptive_json = dplyr::if_else(fs::is_file(kaptive_json),
+                                parse_kaptive_json(kaptive_json), kaptive_json)
+  kaptive_json |>
+    dplyr::select(c('Assembly name', 'Best match', 'blastn result')) |> 
+    tidyr::unpack(c('Best match', 'blastn result')) |> 
+    tidyr::unnest('Locus assembly pieces') |> 
+    dplyr::select(!c(Reference, Sequence))
+}
+
+
+
 
