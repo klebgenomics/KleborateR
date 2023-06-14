@@ -539,3 +539,18 @@ kleborate_column_spec <- vroom::cols(
   rmpC = vroom::col_character(),
   spurious_virulence_hits = vroom::col_character()
   )
+
+read_kleborate_file <- function(path) {
+  if(fs::is_file(path) && !fs::is_file_empty(path)){
+    return(readr::read_csv(path, col_types = kleborate_column_spec, 
+                           show_col_types = FALSE))
+  } else {
+    warning(paste(path, "is not a valid file"))
+    return(NULL)
+  }
+}
+
+read_kleborate_files <- function(paths, show_progress=FALSE) {
+  purrr::list_rbind(purrr::map(paths, read_kleborate_file, 
+                               .progress = show_progress))
+}
