@@ -15,14 +15,27 @@ Sero-epi Shiny App or the PathogenWatch website.
 
 In this example, I have downloaded both the Kleborate output and distance matrix from my PathogenWatch collection.
 
+We will first load Kleborate functions for loading a single or multiple Kleborate files generated from either the
+the command-line version of Kleborate or Pathogenwatch.
+
 ```r
-kleborate <- readr::read_csv("pathogenwatch_kleborate.csv")
+source("https://raw.githubusercontent.com/klebgenomics/KleborateR/main/kleborate_functions.R")
+````
+
+```r
+kleborate <- read_kleborate_file("pathogenwatch_kleborate.csv")
 ```
 
 Or if the data is from a URL...
 
 ```r
-kleborate <- readr::read_csv("kleborate_data_maybe_from_figshare_or_github_raw_url.csv")
+kleborate <- read_kleborate_file("kleborate_data_maybe_from_figshare_or_github_raw_url.csv")
+```
+
+Or if you have multiple CSVs from different runs...
+
+```r
+kleborate <- read_kleborate_files(fs::dir_ls(glob="kleborate_*.csv"))
 ```
 
 Let's load in the cluster functions from this repo.
