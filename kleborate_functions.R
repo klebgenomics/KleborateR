@@ -21,7 +21,7 @@ get_counts <- function(
     kleborate_data, 
     var1, 
     large_cluster_size = 3,
-    adj_vars=c('Cluster', 'ST'),
+    adj_vars=c('Cluster', 'Site', 'Country'),
     epi_vars = c("ST", "K_locus", "K_type", "O_locus", "O_type", "Cluster")
 ){
   
@@ -60,7 +60,15 @@ get_counts <- function(
   message(paste("Grouping var:", var1))
   message(paste("Epi vars:", paste(epi_vars, collapse = ", ")))
   message(paste("Adj vars:", paste(adj_vars, collapse = ", ")))
-  
+
+  #if ("K_locus" %in% var1){
+  	kleborate_data <- kleborate_data %>%
+  		filter(K_locus != "unknown (KL107)") %>%
+  		filter(!(K_locus =="KL107" & K_locus_confidence=="None")) %>%
+  		mutate(K_locus = str_replace(K_locus, "unknown \\(", "")) %>%
+  		mutate(K_locus = str_replace(K_locus, "\\)", ""))
+ # }
+    
   return(
     kleborate_data |>
       dplyr::reframe(  # Perform a raw and adjusted count
@@ -82,36 +90,46 @@ get_counts <- function(
       dplyr::arrange(-adj_prop) # Sort
   )}
 
-#' Calculate the raw and outbreak adjusted proportions of Kleborate columns
+#' Calculate the raw and outbreak adjusted counts and proportions for variable 
+#' combinations of interest.
+#' 
 #' @description
-#' `raw_adj_prop()` is used to calculate the raw and outbreak adjusted 
-#' proportions of multiple Kleborate columns relative to one another. For example,
-#' if grouping_vars = c('K_locus', 'ST'), the proportions are the percent of each
-#' K-locus that has a particular ST, with total/adjusted K-locus counts being
-#' the denominator ('K_locus' by default).
-#' If we wanted to reverse this, and see what proportion of each ST has a 
-#' particular K-locus, we can change the denominator to 'ST', or simply
-#' change the variable order c('ST', 'K_locus').
-#' WARNING: due to the nature of the `all_of()` function, the grouping vars
-#' must be removed from the outbreak adjustment vars, which may lead to
-#' inconsistencies in the outbreak adjustment method.
+#' `raw_adj_prop()` is used to calculate raw and outbreak-adjusted counts, stratified by 
+#' combinations of variables. The output will include counts and proportions for all 
+#' observed combinations of the grouping_vars, and adjusted proportions will use as the
+#' denominator all unique combinations of the grouping_vars AND adj_vars (which would 
+#' usually be clusters).
+#' For example, to calculate K-locus counts and frequencies per country, adjusted for
+#' outbreak clusters, we set grouping_vars=c("K_locus", "Country"), summarise_by="Country"
+#' and leave the default setting of adj_vars="Cluster" in order to produce outbreak-adjusted
+#' counts and proportions. Or, to see the frequency of STs per K-locus, we set 
+#' grouping_vars=c("K_locus", "ST"), summarise_by="K_locus".
+#' Note that all unique values for the specified variables are counted separately, and 
+#' contribute to unique variable combinations that will count as separate clusters.
+#' This means that two strains in the same cluster and country, one with K_locus='KL112' 
+#' and the other with K_locus='unknown (KL112)' will be counted as 2 distinct clusters.
+#' 
+#' WARNING: due to the nature of the `all_of()` function, var1 must be removed 
+#' from the outbreak adjustment vars, which may lead to inconsistencies in the 
+#' outbreak adjustment method.
+#' 
 #' @param kleborate_data A tibble
 #' @param grouping_vars A string vector of columns to calculate proportions for
-#' @param denominator A string referring to the column used as the proportion
-#' denominator
+#' @param summarise_by A string referring to the column used to summarise proportion
+#' denominators by
 #' @param adj_vars A string vector of columns used to perform outbreak adjustment
 #' @export
 raw_adj_prop <- function(
     kleborate_data,
-    grouping_vars,
-    denominator = 'default',
-    adj_vars = c('Cluster', 'ST')
+    grouping_vars = c("K_locus", "Country"),
+    summarise_by = "Country",
+    adj_vars = c("Cluster")
     ){
   
   # Check args
   if(!is_tibble(kleborate_data)){stop(paste(base::quote(kleborate_data), "must be a tibble"))}
-  if(!is.character(denominator)){stop("denominator must be a string")}
-  if(denominator=='default'){denominator=grouping_vars[1]}
+  if(!is.character(summarise_by)){stop("summarise_by must be a string (variable name)")}
+  if(summarise_by=='default'){summarise_by=grouping_vars[1]}
   for(i in c(adj_vars, grouping_vars)){
     if(!i %in% names(kleborate_data)){
       stop(paste(i, "not in", base::quote(kleborate_data)))
@@ -126,8 +144,16 @@ raw_adj_prop <- function(
       }
   }
   message(paste("Grouping vars:", paste(grouping_vars, collapse = ", ")))
-  message(paste("Denominator:", denominator))
+  message(paste("Summarising by:", summarise_by))
   message(paste("Adj vars:", paste(adj_vars, collapse = ", ")))
+  
+  #if ("K_locus" %in% grouping_vars){
+  	kleborate_data <- kleborate_data %>%
+  		filter(K_locus != "unknown (KL107)") %>%
+  		filter(!(K_locus =="KL107" & K_locus_confidence=="None")) %>%
+  		mutate(K_locus = str_replace(K_locus, "unknown \\(", "")) %>%
+  		mutate(K_locus = str_replace(K_locus, "\\)", ""))
+  #}
   
   return(
     kleborate_data |>
@@ -137,18 +163,23 @@ raw_adj_prop <- function(
         adj_count = dplyr::n_distinct(across(all_of(adj_vars))),  # Adjusted
         ) |>
       dplyr::mutate(  # Perfrom proportion calculation
-        .by = tidyselect::all_of(denominator),  # Group by the denominator (mitigates a group_by function call)
+        .by = tidyselect::all_of(summarise_by),  # Group by the summary variable (mitigates a group_by function call)
         raw_prop = raw_count/sum(raw_count),  # Raw
-        adj_prop = adj_count/sum(adj_count)   # Adjusted
+        adj_prop = adj_count/sum(adj_count),   # Adjusted
+        raw_sum = sum(raw_count),
+        adj_sum = sum(adj_count)
       ) |>
       dplyr::distinct() |>
      dplyr:: arrange(-adj_count)
-  )} 
+  )}  
+
 
 #' Filter genomes in a Kleborate output tibble
 #' @description
 #' `genome_filter()` removes undesirable genomes from Kleborate results
 #' using pre-defined parameters that can be tweaked.
+#' Defaults for contig count and genome size are those set by KlebNET GSP, see
+#' https://bigsdb.pasteur.fr/klebsiella/genome-quality-check/
 #' @param kleborate_data A tibble
 #' @param species A string vector of species to keep
 #' @param k_typable Logical to drop K-locus confidence calls of "Low" and "None"
@@ -160,11 +191,11 @@ raw_adj_prop <- function(
 genome_filter <- function(
     kleborate_data, 
     species = c("Klebsiella pneumoniae"), 
-    k_typable=TRUE, 
+    k_typable=FALSE, 
     o_typable=TRUE,
-    max_contigs=275, 
-    max_size=6500000,
-    min_size=2500000
+    max_contigs=500, 
+    max_size=6200000,
+    min_size=5000000
     ){
   # Check args
   if(!is_tibble(kleborate_data)){stop("kleborate_data must be a tibble")}
@@ -391,4 +422,135 @@ trait_stats <- function(kleborate_data, trait1, trait2, stat_test,
     as.matrix() |>
     cor()
   }
+}
+
+kleborate_column_spec <- vroom::cols(
+  `Genome ID` = vroom::col_character(),
+  `Genome Name` = vroom::col_character(),
+  Version = vroom::col_character(),
+  `Kleborate version` = vroom::col_character(),
+  strain = vroom::col_character(),
+  species = vroom::col_character(),
+  species_match = vroom::col_character(),
+  contig_count = vroom::col_double(),
+  N50 = vroom::col_double(),
+  largest_contig = vroom::col_double(),
+  total_size = vroom::col_double(),
+  ambiguous_bases = vroom::col_character(),
+  QC_warnings = vroom::col_character(),
+  ST = vroom::col_character(),
+  virulence_score = vroom::col_double(),
+  resistance_score = vroom::col_double(),
+  num_resistance_classes = vroom::col_double(),
+  num_resistance_genes = vroom::col_double(),
+  Yersiniabactin = vroom::col_character(),
+  YbST = vroom::col_character(),
+  Colibactin = vroom::col_character(),
+  CbST = vroom::col_character(),
+  Aerobactin = vroom::col_character(),
+  AbST = vroom::col_character(),
+  Salmochelin = vroom::col_character(),
+  SmST = vroom::col_character(),
+  RmpADC = vroom::col_character(),
+  RmST = vroom::col_character(),
+  rmpA2 = vroom::col_character(),
+  wzi = vroom::col_character(),
+  K_locus = vroom::col_character(),
+  K_type = vroom::col_character(),
+  K_locus_problems = vroom::col_character(),
+  K_locus_confidence = vroom::col_character(),
+  K_locus_identity = vroom::col_character(),
+  K_locus_missing_genes = vroom::col_character(),
+  O_locus = vroom::col_character(),
+  O_type = vroom::col_character(),
+  O_locus_problems = vroom::col_character(),
+  O_locus_confidence = vroom::col_character(),
+  O_locus_identity = vroom::col_character(),
+  O_locus_missing_genes = vroom::col_character(),
+  AGly_acquired = vroom::col_character(),
+  Col_acquired = vroom::col_character(),
+  Fcyn_acquired = vroom::col_character(),
+  Flq_acquired = vroom::col_character(),
+  Gly_acquired = vroom::col_character(),
+  MLS_acquired = vroom::col_character(),
+  Phe_acquired = vroom::col_character(),
+  Rif_acquired = vroom::col_character(),
+  Sul_acquired = vroom::col_character(),
+  Tet_acquired = vroom::col_character(),
+  Tgc_acquired = vroom::col_character(),
+  Tmt_acquired = vroom::col_character(),
+  Bla_acquired = vroom::col_character(),
+  Bla_inhR_acquired = vroom::col_character(),
+  Bla_ESBL_acquired = vroom::col_character(),
+  Bla_ESBL_inhR_acquired = vroom::col_character(),
+  Bla_Carb_acquired = vroom::col_character(),
+  Bla_chr = vroom::col_character(),
+  SHV_mutations = vroom::col_character(),
+  Omp_mutations = vroom::col_character(),
+  Col_mutations = vroom::col_character(),
+  Flq_mutations = vroom::col_character(),
+  truncated_resistance_hits = vroom::col_character(),
+  spurious_resistance_hits = vroom::col_character(),
+  Chr_ST = vroom::col_character(),
+  gapA = vroom::col_double(),
+  infB = vroom::col_double(),
+  mdh = vroom::col_double(),
+  pgi = vroom::col_double(),
+  phoE = vroom::col_double(),
+  rpoB = vroom::col_double(),
+  tonB = vroom::col_double(),
+  ybtS = vroom::col_character(),
+  ybtX = vroom::col_character(),
+  ybtQ = vroom::col_character(),
+  ybtP = vroom::col_character(),
+  ybtA = vroom::col_character(),
+  irp2 = vroom::col_character(),
+  irp1 = vroom::col_character(),
+  ybtU = vroom::col_character(),
+  ybtT = vroom::col_character(),
+  ybtE = vroom::col_character(),
+  fyuA = vroom::col_character(),
+  clbA = vroom::col_character(),
+  clbB = vroom::col_character(),
+  clbC = vroom::col_character(),
+  clbD = vroom::col_character(),
+  clbE = vroom::col_character(),
+  clbF = vroom::col_character(),
+  clbG = vroom::col_character(),
+  clbH = vroom::col_character(),
+  clbI = vroom::col_character(),
+  clbL = vroom::col_character(),
+  clbM = vroom::col_character(),
+  clbN = vroom::col_character(),
+  clbO = vroom::col_character(),
+  clbP = vroom::col_character(),
+  clbQ = vroom::col_character(),
+  iucA = vroom::col_character(),
+  iucB = vroom::col_character(),
+  iucC = vroom::col_character(),
+  iucD = vroom::col_character(),
+  iutA = vroom::col_character(),
+  iroB = vroom::col_character(),
+  iroC = vroom::col_character(),
+  iroD = vroom::col_character(),
+  iroN = vroom::col_character(),
+  rmpA = vroom::col_character(),
+  rmpD = vroom::col_character(),
+  rmpC = vroom::col_character(),
+  spurious_virulence_hits = vroom::col_character()
+  )
+
+read_kleborate_file <- function(path) {
+  if(fs::is_file(path) && !fs::is_file_empty(path)){
+    return(readr::read_csv(path, col_types = kleborate_column_spec, 
+                           show_col_types = FALSE))
+  } else {
+    warning(paste(path, "is not a valid file"))
+    return(NULL)
+  }
+}
+
+read_kleborate_files <- function(paths, show_progress=FALSE) {
+  purrr::list_rbind(purrr::map(paths, read_kleborate_file, 
+                               .progress = show_progress))
 }
