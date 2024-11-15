@@ -62,11 +62,11 @@ get_counts <- function(
   message(paste("Adj vars:", paste(adj_vars, collapse = ", ")))
 
   #if ("K_locus" %in% var1){
-  	kleborate_data <- kleborate_data %>%
-  		filter(K_locus != "unknown (KL107)") %>%
-  		filter(!(K_locus =="KL107" & K_locus_confidence=="None")) %>%
-  		mutate(K_locus = str_replace(K_locus, "unknown \\(", "")) %>%
-  		mutate(K_locus = str_replace(K_locus, "\\)", ""))
+  #	kleborate_data <- kleborate_data %>%
+  #		filter(K_locus != "unknown (KL107)") %>%
+  #		filter(!(K_locus =="KL107" & K_locus_confidence=="None")) %>%
+  #		mutate(K_locus = str_replace(K_locus, "unknown \\(", "")) %>%
+  #		mutate(K_locus = str_replace(K_locus, "\\)", ""))
  # }
     
   return(
