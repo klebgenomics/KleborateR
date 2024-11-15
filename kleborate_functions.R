@@ -60,14 +60,6 @@ get_counts <- function(
   message(paste("Grouping var:", var1))
   message(paste("Epi vars:", paste(epi_vars, collapse = ", ")))
   message(paste("Adj vars:", paste(adj_vars, collapse = ", ")))
-
-  #if ("K_locus" %in% var1){
-  #	kleborate_data <- kleborate_data %>%
-  #		filter(K_locus != "unknown (KL107)") %>%
-  #		filter(!(K_locus =="KL107" & K_locus_confidence=="None")) %>%
-  #		mutate(K_locus = str_replace(K_locus, "unknown \\(", "")) %>%
-  #		mutate(K_locus = str_replace(K_locus, "\\)", ""))
- # }
     
   return(
     kleborate_data |>
@@ -146,14 +138,7 @@ raw_adj_prop <- function(
   message(paste("Grouping vars:", paste(grouping_vars, collapse = ", ")))
   message(paste("Summarising by:", summarise_by))
   message(paste("Adj vars:", paste(adj_vars, collapse = ", ")))
-  
-  #if ("K_locus" %in% grouping_vars){
-  	kleborate_data <- kleborate_data %>%
-  		filter(K_locus != "unknown (KL107)") %>%
-  		filter(!(K_locus =="KL107" & K_locus_confidence=="None")) %>%
-  		mutate(K_locus = str_replace(K_locus, "unknown \\(", "")) %>%
-  		mutate(K_locus = str_replace(K_locus, "\\)", ""))
-  #}
+
   
   return(
     kleborate_data |>
